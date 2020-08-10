@@ -4,7 +4,8 @@ import * as _ from 'lodash';
 import {
   getEpcs,
   getTransformOutputEpcs,
-  getTransactions
+  getTransactions,
+  getPurchaseOrdersArray
 } from './ift-service';
 
 import {
@@ -149,6 +150,16 @@ export const getIngredientSourcesHandler: express.RequestHandler = catchAsync(as
   return res.status(400).json({
     status: 'bad request, invalid value for "output"; should be either "JSON" or "CSV"'
   });
+});
+
+export const getPOsHandler: express.RequestHandler = catchAsync(async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  // This will get all the commissioned input epcs and related data
+  const data = await getPurchaseOrdersArray(req, 1);
+  return res.status(200).json(data);
 });
 
 /**

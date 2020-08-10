@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { getIngredientSourcesHandler,
          getEpcsHandler,
          getEpcsWithTransformsHandler,
-         getTransactionsHandler
+         getTransactionsHandler,
+         getPOsHandler
        } from './controller';
 
 export class TraceAssistantRouter {
@@ -20,6 +21,9 @@ export class TraceAssistantRouter {
 
     // Return commisisoned EPCs and their related data
     router.get('/ingredient-sources' , getIngredientSourcesHandler);
+
+    // Return Transactions that contain impacted EPCs
+    router.get('/purchase-order-details' , getPOsHandler);
 
     return router;
   }

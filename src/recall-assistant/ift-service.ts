@@ -320,6 +320,78 @@ export async function runTrace(req,
   }
 }
 
+export async function getPurchaseOrdersArray(req, incrementDays) {
+  const startTime = req.query.event_start_timestamp;
+  const startDate = new Date(startTime);
+  const endDateRequested = new Date(req.query.event_end_timestamp);
+  const productUoms = {};
+  let daysIncremented = 0;
+  let endDateAllowed;
+
+  do {
+    const thisStartTime = new Date(startDate);
+    thisStartTime.setDate(startDate.getDate() + daysIncremented);
+    const startTimeString = thisStartTime.toISOString().slice(0, 10);
+
+    // End date is the earlier of a week after the start or the requested end time
+    endDateAllowed = new Date(startDate);
+    endDateAllowed.setDate(startDate.getDate() + daysIncremented + incrementDays);
+    const endDate = endDateRequested.getTime() < endDateAllowed.getTime() ? endDateRequested : endDateAllowed;
+    const thisEndTime = endDate.toISOString().slice(0, 10);
+    await getPurchaseOrders(req, startTimeString, thisEndTime, productUoms);
+    daysIncremented += incrementDays;
+  } while (endDateRequested.getTime() > endDateAllowed.getTime());
+
+  return productUoms;
+}
+
+// Find all aggregations where the input EPCs are children, and return referenced transactions
+export async function getPurchaseOrders(req, startTime, endTime, productUoms, next?) {
+  const traceCallUri = next ? next.href : `${config.ift_url}/transactions/purchase_orders?creation_start_timestamp=${startTime}&creation_end_timestamp=${endTime}&limit=1000`;
+  console.info(`Trace call to get tranformations from impacted EPCs: ${traceCallUri}`);
+
+  const options = {
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: req.headers['authorization']//,
+      // 'ift-view-as': '99ed75e4-1419-4522-bbaf-7d53813dd2e3'
+      //'c81dd5e1-f621-4960-bed9-79b5850babcf'
+    },
+    uri: traceCallUri,
+    method: 'GET',
+  };
+  // Issue request to the trace API
+  return rp(options).then(async (traceResponse: any) => {
+    const eventsObj = JSON.parse(traceResponse);
+    eventsObj.purchase_orders.forEach((po) => {
+      const assetPrefix = 'urn:ibm:provenance:asset:transaction:order:c81dd5e1-f621-4960-bed9-79b5850babcf:default:default:';
+      if (!po.asset_id.startsWith(assetPrefix)) {
+        // Loop through transactions on each event to get ids/uoms
+        po.line_items.forEach((lineItem) => {
+          const prod_uom = lineItem.product_id + ',' + lineItem.uom;
+          if (!productUoms[prod_uom]) {
+            productUoms[prod_uom] = {};
+          }
+          if (!productUoms[prod_uom][startTime]) {
+            productUoms[prod_uom][startTime] = lineItem.quantity;
+          } else {
+            productUoms[prod_uom][startTime] += lineItem.quantity;
+          }
+        });
+      }
+    });
+    if (eventsObj.next) {
+      await getPurchaseOrders(req, startTime, endTime, productUoms, eventsObj.next);
+      return;
+    }
+    return;
+  }).catch((err) => {
+    console.error(`Error getting transaction details: ${err}`);
+    throw err;
+  });
+}
+
 /**
  * Method to call location API to fetch location data
  */

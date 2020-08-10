@@ -82,6 +82,16 @@ paths:
         '200':
           description: OK
 
+  /purchase-order-details:
+    get:
+      summary: Return purchase order totals
+      parameters:
+        - $ref: '#/components/parameters/eventStartTimestamp'
+        - $ref: '#/components/parameters/eventEndTimestamp'
+      responses:
+        '200':
+          description: OK
+
 components:
   securitySchemes:
     bearerAuth:
